@@ -141,7 +141,7 @@ POST https://api.solanaportal.io/api/create/token/pumpfun
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/yourusername/solanaportal-pumpfun-api.git
+git clone https://github.com/Rashadkhan2/pumpfun-api.git
 cd solanaportal-pumpfun-api
 npm install
 ```
