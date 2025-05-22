@@ -1,12 +1,15 @@
 # SolanaPortal PumpFun API
 
-This repository contains a simple Node.js CLI bot that uses the SolanaPortal PumpFun API to buy and sell SPL tokens on Solana via Jito’s RPC endpoint.
+A simple Node.js CLI bot that uses SolanaPortal’s PumpFun API to:
+
+- **Swap SPL tokens** (buy/sell) via Jito’s RPC  
+- **Create your own PumpFun mint** (metadata upload + on-chain mint)  
+
+Everything runs locally in ESM mode, with transactions built by SolanaPortal, signed in your wallet, and sent through Jito for max speed.
 
 ---
 
-## 🚀 How the PumpFun API Works
-
-SolanaPortal’s `/api/trading` endpoint builds and returns a base64-encoded transaction for a PumpFun swap. You submit this payload along with your parameters, sign it locally, and then send it to Solana via Jito.
+## 🚀 How the Trading (Buy/Sell) API Works
 
 ### Endpoint
 
@@ -14,139 +17,196 @@ SolanaPortal’s `/api/trading` endpoint builds and returns a base64-encoded tra
 POST https://api.solanaportal.io/api/trading
 ```
 
-### Required Parameters
+### Request Parameters
 
 | Field            | Type     | Description                                                                      |
 | ---------------- | -------- | -------------------------------------------------------------------------------- |
 | `wallet_address` | `string` | Your Solana wallet public key (Base58).                                          |
-| `action`         | `string` | Either `"buy"` or `"sell"`.                                                      |
-| `dex`            | `string` | Always `"pumpfun"` for this script.                                              |
-| `mint`           | `string` | The mint address of the token to trade (Base58).                                 |
-| `amount`         | `number` | If buying: the amount of SOL to spend. If selling: the amount of tokens to sell. |
-| `slippage`       | `number` | Maximum price impact tolerance as a percent (integer between 1 and 100).         |
-| `tip`            | `number` | Jito tip in SOL (e.g. `0.0001`).                                                 |
-| `type`           | `string` | Always `"jito"` in this implementation.                                          |
+| `action`         | `string` | `"buy"` or `"sell"`.                                                             |
+| `dex`            | `string` | `"pumpfun"`.                                                                     |
+| `mint`           | `string` | The token mint address (Base58).                                                 |
+| `amount`         | `number` | SOL amount to spend (buy) or token amount to sell.                               |
+| `slippage`       | `number` | Max price impact tolerance (%) between 1–100.                                    |
+| `tip`            | `number` | Jito tip in SOL (e.g. `0.0001`).                                                  |
+| `type`           | `string` | `"jito"` (this implementation).                                                  |
 
 ### Response
 
-* **200 OK**: Returns a base64 string representing a VersionedTransaction.
-* **Error**: Non-200 response with error text in the body.
+- **200 OK**  
+  Returns a base64-encoded `VersionedTransaction` for you to decode/sign/submit.
+- **Error**  
+  Non-200 status with error details in the response body.
 
 ---
 
-## 📝 Signing & Submitting Transactions
+## 📚 Token Creation (Mint) API
 
-1. Decode base64 payload to a `VersionedTransaction`.
+PumpFun lets you deploy your own SPL token + first liquidity in one command:
 
-2. Sign locally using your `PRIVATE_KEY` (loaded from `.env`).
+1. **Save** your token info in `token.json` (name, symbol, description, image path, and other metadata).  
+2. **Upload** Metadata + Image to IPFS via PumpFun’s IPFS endpoint.  
+3. **Request** a “create token” transaction from SolanaPortal.  
+4. **Sign** it locally.  
+5. **Send** via Jito RPC.  
+6. **Log** the Solscan URL on success.
 
-3. Encode the signed transaction to Base58.
+> **Note:** The script reads your metadata from `token.json` first, so be sure to configure it before running.
 
-4. Submit via Jito’s RPC endpoint:
+### 1. IPFS Metadata Upload
 
-   ```http
-   POST https://tokyo.mainnet.block-engine.jito.wtf/api/v1/transactions
-   Content-Type: application/json
+```
+POST https://pump.fun/api/ipfs
+```
 
-   {
-     "jsonrpc": "2.0",
-     "id": 1,
-     "method": "sendTransaction",
-     "params": [ "<SIGNED_TRANSACTION_BASE58>" ]
-   }
-   ```
+**FormData fields**:
 
-5. On success, Jito returns a transaction signature you can view on Solscan.
+| Field         | Type         | Description                   |
+| ------------- | ------------ | ----------------------------- |
+| `file`        | Binary image | PNG/JPG token logo            |
+| `name`        | `string`     | Token name (e.g. “My Token”)  |
+| `symbol`      | `string`     | Token symbol (e.g. “MTK”)     |
+| `description` | `string`     | Token description             |
+| `twitter`     | `string`     | (optional) Twitter URL        |
+| `telegram`    | `string`     | (optional) Telegram URL       |
+| `website`     | `string`     | (optional) Website URL        |
+| `showName`    | `string`     | `"true"` to display on UI     |
+
+**Response**:
+
+```json
+{
+  "metadataUri": "https://…/metadata.json",
+  "metadata": {
+    "name": "My Token",
+    "symbol": "MTK",
+    "…": "…"
+  }
+}
+```
+
+### 2. Create-Token API
+
+```
+POST https://api.solanaportal.io/api/create/token/pumpfun
+```
+
+**JSON body**:
+
+| Field            | Type     | Description                                            |
+| ---------------- | -------- | ------------------------------------------------------ |
+| `wallet_address` | `string` | Your wallet public key.                                |
+| `name`           | `string` | Must match `metadata.name`.                            |
+| `symbol`         | `string` | Must match `metadata.symbol`.                          |
+| `metadataUri`    | `string` | URI returned from IPFS step.                           |
+| `amount`         | `number` | SOL to pay for initial mint (e.g. `0.01`).             |
+| `slippage`       | `number` | % slippage tolerance (1–100).                          |
+| `tip`            | `number` | Jito tip in SOL (e.g. `0.0005`).                       |
+| `type`           | `string` | `"jito"`.                                              |
+
+**Response**:
+
+- **200 OK**:  
+  Returns a base64 string (the unsigned transaction).  
+- **Post-Sign**:  
+  After signing and sending via Jito, your script will log:
+
+  ```
+  txn succeed: https://solscan.io/tx/<TX_SIGNATURE>
+  ```
 
 ---
 
 ## 💻 Code Overview
 
-The main script is located at `src/index.js`:
+### `src/index.js` – Trading CLI
 
-```js
-import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes/index.js";
-import { Keypair, VersionedTransaction } from "@solana/web3.js";
-import fetch from "node-fetch";
-import { config as configDotenv } from "dotenv";
-import readline from "readline/promises";
-import { stdin, stdout } from "process";
+1. Prompts: **buy/sell** → **mint** → **amount** → **slippage** → **tip**  
+2. Calls `/api/trading` → deserializes & signs → sends via Jito  
+3. Prints Solscan link on success  
 
-configDotenv();
+### `src/createToken.js` – Token Creation
 
-async function main() {
-  // 1. Prompt user: buy/sell
-  // 2. Prompt mint, amount, slippage, tip
-  // 3. Call SolanaPortal API
-  // 4. Deserialize, sign, and serialize transaction
-  // 5. Submit via Jito
-  // 6. Log success or error
-}
+1. Reads **`token.json`** for metadata & local image path  
+2. Uploads logo + metadata to `https://pump.fun/api/ipfs`  
+3. Calls SolanaPortal create-token endpoint  
+4. Signs & sends via Jito  
+5. Logs:
 
-main();
+   ```
+   txn succeed: https://solscan.io/tx/<TX_SIGNATURE>
+   ```
+
+---
+
+## 📦 Installation
+
+```bash
+git clone https://github.com/yourusername/solanaportal-pumpfun-api.git
+cd solanaportal-pumpfun-api
+npm install
 ```
 
-Key points:
+### Environment Variables
 
-* Uses `dotenv` to load `PRIVATE_KEY` and `RPC_URL`.
-* Uses Node’s `readline/promises` for a simple CLI.
-* Ensures ESM mode (`"type": "module"` in `package.json`).
+Create a `.env` in project root:
 
----
-
-## 📦 Installation & Running
-
-1. **Clone** this repository:
-
-   ```bash
-   git clone https://github.com/Rashadkhan2/pumpfun-api
-   cd solanaportal-pumpfun-api
-   ```
-
-2. **Install** dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. **Configure** environment variables in a `.env` file at the project root:
-
-   ```dotenv
-   PRIVATE_KEY=<your_base58_secret_key>
-   RPC_URL=https://tokyo.mainnet.block-engine.jito.wtf/api/v1/transactions
-   ```
-
-4. **Run** the bot:
-
-   ```bash
-   npm start
-   ```
-
-5. **Follow prompts** to buy or sell tokens.
+```dotenv
+PRIVATE_KEY=<your_base58_secret_key>
+RPC_URL=https://tokyo.mainnet.block-engine.jito.wtf/api/v1/transactions
+```
 
 ---
 
-## 💸 Buying & Selling
+## 🚀 Running
 
-1. **Action**: Choose `buy` or `sell`.
-2. **Mint**: Provide the token’s mint address.
-3. **Amount**:
+- **Trading Bot**  
+  ```bash
+  npm start
+  ```  
 
-   * If `buy`: enter amount of SOL.
-   * If `sell`: enter amount of tokens.
-4. **Slippage**: Enter tolerance (1–100%).
-5. **Tip**: Enter Jito tip in SOL (e.g. `0.0001`).
+- **Create Token**  
+  ```bash
+  npm run create-token
+  ```
 
-After you confirm, the bot:
+---
 
-* Builds and signs a transaction.
-* Sends it through Jito’s RPC.
-* Prints a Solscan link on success.
+## 🔧 Configuration Files
+
+### `token.json`
+
+Place alongside `/src` and your `.env`. Example:
+
+```json
+{
+  "name": "SolanaPortal",
+  "symbol": "SPA",
+  "description": "Testing SolanaPortal API for pumpfun token creation",
+  "image": "./token.png",
+  "twitter": "https://docs.solanaportal.io",
+  "telegram": "https://docs.solanaportal.io",
+  "website": "https://docs.solanaportal.io",
+  "showName": true,
+  "amount": 0.01,
+  "slippage": 100,
+  "tip": 0.0005
+}
+```
+
+- **`image`**: Path to your PNG/JPG logo  
+- **`amount`**: SOL to fund the mint  
+- **`slippage`**/**`tip`**: As in the tables above  
+
+---
+
+## 💸 Usage
+
+1. **`npm start`** → follow prompts to **buy** or **sell**.  
+2. **`npm run create-token`** → mints your own token with initial SOL.  
 
 ---
 
 ## 📚 Further Reading
 
-For full SolanaPortal PumpFun API docs, visit:
-
-> [https://docs.solanaportal.io](https://docs.solanaportal.io)
+Full SolanaPortal PumpFun docs:  
+👉 https://docs.solanaportal.io
